@@ -91,19 +91,28 @@ pipeline {
             }
         }
 
-
-
-
         stage('Validate & reload NGINX') {
             steps {
-                sh '''
-                    set -e
-                    docker exec nginx-reverse-proxy nginx -t
-                    docker exec nginx-reverse-proxy nginx -s reload
-                '''
+                sshagent(['DEBIANSERVER']) {
+                    sh '''
+                        set -e
+
+                        REMOTE_HOST=192.168.88.22
+                        SSH_USER=funmicra
+                        SSH_OPTS="-o StrictHostKeyChecking=no -o BatchMode=yes"
+
+                        echo "Validating NGINX configuration"
+                        ssh $SSH_OPTS "$SSH_USER@$REMOTE_HOST" \
+                        "docker exec nginx-reverse-proxy nginx -t"
+
+                        echo "Reloading NGINX"
+                        ssh $SSH_OPTS "$SSH_USER@$REMOTE_HOST" \
+                        "docker exec nginx-reverse-proxy nginx -s reload"
+                    '''
+                }
             }
         }
-    }
+
 
     post {
         always {
