@@ -48,15 +48,15 @@ pipeline {
 
         stage('Issue certificate') {
             steps {
-                withEnv(["VAULT_TOKEN=$(<${WORKSPACE}/vault.token)"]) {
-                    sh '''
-                        set -e
-                        echo "Issuing certificate via Vault..."
-                        python3 certs_issue.py
-                    '''
-                }
+                sh '''
+                    set -e
+                    export VAULT_TOKEN="$(cat "${WORKSPACE}/vault.token")"
+                    echo "Issuing certificate via Vault..."
+                    python3 certs_issue.py
+                '''
             }
         }
+
 
         stage('Copy certs to local NGINX stack') {
             steps {
