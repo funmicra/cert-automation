@@ -6,6 +6,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 withCredentials([usernamePassword(
@@ -13,8 +14,10 @@ pipeline {
                     usernameVariable: 'GIT_USER',
                     passwordVariable: 'GIT_TOKEN'
                 )]) {
-                    git url: "https://${GIT_USER}:${GIT_TOKEN}@github.com/funmicra/cert-automation.git",
+                    git(
+                        url: "https://${GIT_USER}:${GIT_TOKEN}@github.com/funmicra/cert-automation.git",
                         branch: 'master'
+                    )
                 }
             }
         }
@@ -28,35 +31,32 @@ pipeline {
                 ]) {
                     sh '''
                         set -e
-
                         echo "Logging into Vault..."
+
                         vault write -format=json auth/approle/login \
                             role_id="$ROLE_ID" \
                             secret_id="$SECRET_ID" \
-                            | jq -r .auth.client_token > "${WORKSPACE}/vault.token"
+                          | jq -r .auth.client_token > "${WORKSPACE}/vault.token"
 
-                        if [ ! -s "${WORKSPACE}/vault.token" ]; then
-                            echo "Vault login failed: token not generated"
-                            exit 1
-                        fi
+                        test -s "${WORKSPACE}/vault.token"
 
-                        echo "Vault login successful, token saved to vault.token"
+                        echo "Vault authentication successful"
                     '''
                 }
             }
         }
 
         stage('Issue certificate') {
-            steps {                
-                sh '''
-                    set -e
-                    echo "Issuing certificate via Vault..."
-                    python3 certs_issue.py
-                '''
+            steps {
+                withEnv(["VAULT_TOKEN=$(<${WORKSPACE}/vault.token)"]) {
+                    sh '''
+                        set -e
+                        echo "Issuing certificate via Vault..."
+                        python3 certs_issue.py
+                    '''
                 }
             }
         }
-
 
         stage('Copy certs to local NGINX stack') {
             steps {
@@ -72,10 +72,14 @@ pipeline {
                         REMOTE_HOST=192.168.88.22
                         LOCAL_CERT_DIR=/home/funmicra/stacks/nginx-proxy/certs
 
-                        # Ensure directory exists and copy files
-                        ssh -i $SSH_KEY $SSH_USER@$REMOTE_HOST "mkdir -p $LOCAL_CERT_DIR && chmod 700 $LOCAL_CERT_DIR"
-                        scp -i $SSH_KEY syndicate.key fullchain.pem $SSH_USER@$REMOTE_HOST:$LOCAL_CERT_DIR/
-                        ssh -i $SSH_KEY $SSH_USER@$REMOTE_HOST "chmod 600 $LOCAL_CERT_DIR/syndicate.key $LOCAL_CERT_DIR/fullchain.pem"
+                        ssh -i "$SSH_KEY" "$SSH_USER@$REMOTE_HOST" \
+                          "mkdir -p $LOCAL_CERT_DIR && chmod 700 $LOCAL_CERT_DIR"
+
+                        scp -i "$SSH_KEY" syndicate.key fullchain.pem \
+                          "$SSH_USER@$REMOTE_HOST:$LOCAL_CERT_DIR/"
+
+                        ssh -i "$SSH_KEY" "$SSH_USER@$REMOTE_HOST" \
+                          "chmod 600 $LOCAL_CERT_DIR/syndicate.key $LOCAL_CERT_DIR/fullchain.pem"
                     '''
                 }
             }
@@ -85,7 +89,8 @@ pipeline {
             steps {
                 sh '''
                     set -e
-                    docker exec nginx-reverse-proxy nginx -t && docker exec nginx-reverse-proxy nginx -s reload
+                    docker exec nginx-reverse-proxy nginx -t
+                    docker exec nginx-reverse-proxy nginx -s reload
                 '''
             }
         }
@@ -93,10 +98,10 @@ pipeline {
 
     post {
         always {
-            sh 'rm -rf ${WORKSPACE}/certs'
+            sh 'rm -rf "${WORKSPACE}/certs" "${WORKSPACE}/vault.token"'
         }
         failure {
-            echo "Certificate rotation failed. No reload performed."
+            echo "Certificate rotation failed. NGINX was not reloaded."
         }
     }
 }
