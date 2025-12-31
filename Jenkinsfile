@@ -65,15 +65,22 @@ pipeline {
                         REMOTE_HOST=192.168.88.22
                         SSH_USER=funmicra
                         LOCAL_CERT_DIR=/home/$SSH_USER/stacks/nginx-proxy/certs
+                        CERT_DIR="${WORKSPACE}/certs"
 
                         SSH_OPTS="-o StrictHostKeyChecking=no -o BatchMode=yes"
+
+                        echo "Verifying certificates exist"
+                        test -f "$CERT_DIR/syndicate.key"
+                        test -f "$CERT_DIR/fullchain.pem"
 
                         echo "Preparing certificate directory on remote host"
                         ssh $SSH_OPTS "$SSH_USER@$REMOTE_HOST" \
                         "mkdir -p $LOCAL_CERT_DIR && chmod 700 $LOCAL_CERT_DIR"
 
                         echo "Copying certificates"
-                        scp $SSH_OPTS syndicate.key fullchain.pem \
+                        scp $SSH_OPTS \
+                        "$CERT_DIR/syndicate.key" \
+                        "$CERT_DIR/fullchain.pem" \
                         "$SSH_USER@$REMOTE_HOST:$LOCAL_CERT_DIR/"
 
                         echo "Fixing permissions"
@@ -83,6 +90,7 @@ pipeline {
                 }
             }
         }
+
 
 
 
@@ -106,3 +114,6 @@ pipeline {
         }
     }
 }
+
+
+
