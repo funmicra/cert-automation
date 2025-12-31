@@ -22,29 +22,28 @@ pipeline {
             }
         }
 
-        stage('Authenticate to Vault') {
+        stage('Authenticate to Vault (root – test only)') {
             steps {
                 withCredentials([
                     string(credentialsId: 'VAULT_ADDR', variable: 'VAULT_ADDR'),
-                    string(credentialsId: 'VAULT_ROLE_ID', variable: 'ROLE_ID'),
-                    string(credentialsId: 'VAULT_SECRET_ID', variable: 'SECRET_ID')
+                    string(credentialsId: 'VAULT_SECRET_ID', variable: 'VAULT_TOKEN')
                 ]) {
                     sh '''
                         set -e
-                        echo "Logging into Vault..."
+                        echo "Authenticating to Vault using root token (test mode)"
 
-                        vault write -format=json auth/approle/login \
-                            role_id="$ROLE_ID" \
-                            secret_id="$SECRET_ID" \
-                          | jq -r .auth.client_token > "${WORKSPACE}/vault.token"
+                        # Sanity check
+                        vault token lookup > /dev/null
 
-                        test -s "${WORKSPACE}/vault.token"
+                        # Persist token for downstream stages
+                        echo "$VAULT_TOKEN" > "${WORKSPACE}/vault.token"
 
-                        echo "Vault authentication successful"
+                        echo "Vault root authentication successful"
                     '''
                 }
             }
         }
+
 
         stage('Issue certificate') {
             steps {
