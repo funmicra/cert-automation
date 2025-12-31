@@ -47,13 +47,12 @@ pipeline {
         }
 
         stage('Issue certificate') {
-            steps {
-                withEnv(["VAULT_TOKEN=$(<${WORKSPACE}/vault.token)"]) {
-                    sh '''
-                        set -e
-                        echo "Issuing certificate via Vault..."
-                        python3 certs_issue.py
-                    '''
+            steps {                
+                sh '''
+                    set -e
+                    echo "Issuing certificate via Vault..."
+                    python3 certs_issue.py
+                '''
                 }
             }
         }
