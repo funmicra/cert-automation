@@ -6,6 +6,19 @@ pipeline {
     }
 
     stages {
+        stage('Checkout') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'github-creds',
+                    usernameVariable: 'GIT_USER',
+                    passwordVariable: 'GIT_TOKEN'
+                )]) {
+                    git url: "https://${GIT_USER}:${GIT_TOKEN}@github.com/funmicra/cert-automation.git",
+                        branch: 'master'
+                }
+            }
+        }
+
         stage('Authenticate to Vault') {
             steps {
                 withCredentials([
