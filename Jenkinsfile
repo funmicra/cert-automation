@@ -135,10 +135,7 @@ post {
                 "${currentBuild.currentResult}" \
                 "${BUILD_URL}"
             """
+            }
         }
     }
 }
-
-
-
-
