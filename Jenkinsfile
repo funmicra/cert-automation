@@ -121,15 +121,24 @@ pipeline {
         }
     }
 
-    post {
-        always {
-            sh 'rm -rf "${WORKSPACE}/certs" "${WORKSPACE}/vault.token"'
-        }
-        failure {
-            echo "Certificate rotation failed. NGINX was not reloaded."
+post {
+    always {
+        withCredentials([
+            string(credentialsId: 'TELEGRAM_BOT_TOKEN', variable: 'TELEGRAM_BOT_TOKEN'),
+            string(credentialsId: 'TELEGRAM_CHAT_ID', variable: 'TELEGRAM_CHAT_ID')
+        ]) {
+            sh """
+              rm -rf "${WORKSPACE}/certs" "${WORKSPACE}/vault.token"
+              python3 scripts/telegram_notify.py \
+                "${JOB_NAME}" \
+                "${BUILD_NUMBER}" \
+                "${currentBuild.currentResult}" \
+                "${BUILD_URL}"
+            """
         }
     }
 }
+
 
 
 

@@ -16,4 +16,5 @@ dvr.syndicate
 vault.syndicate
 nextcloud.syndicate
 semaphore.syndicate
+lte-router.syndicate
 syndicate
