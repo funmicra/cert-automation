@@ -15,4 +15,5 @@ uptime-kuma.syndicate
 dvr.syndicate
 vault.syndicate
 nextcloud.syndicate
+semaphore.syndicate
 syndicate
