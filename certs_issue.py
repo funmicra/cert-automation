@@ -4,7 +4,7 @@ from pathlib import Path
 import subprocess
 
 # Configuration
-EXPORT_DIR = Path("./certs")
+EXPORT_DIR = Path("/etc/nginx/certs")
 EXPORT_DIR.mkdir(exist_ok=True)
 JSON_FILE = Path("vault_san.json")
 ALT_NAMES_FILE = Path("alt_names.txt")  # File with SANs, one per line
