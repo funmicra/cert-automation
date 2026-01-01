@@ -71,7 +71,7 @@ pipeline {
 
                         REMOTE_HOST=192.168.88.22
                         SSH_USER=funmicra
-                        LOCAL_CERT_DIR=/home/$SSH_USER/stacks/nginx-proxy/certs
+                        LOCAL_CERT_DIR=/etc/nginx/certs
                         CERT_DIR="${WORKSPACE}/certs"
 
                         SSH_OPTS="-o StrictHostKeyChecking=no -o BatchMode=yes"
