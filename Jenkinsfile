@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    triggers {
+        cron('* * * * *')
+    }
+
     environment {
         VAULT_ADDR = credentials('VAULT_ADDR')
     }
