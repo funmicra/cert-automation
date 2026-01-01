@@ -129,7 +129,7 @@ post {
         ]) {
             sh """
               rm -rf "${WORKSPACE}/certs" "${WORKSPACE}/vault.token"
-              python3 scripts/telegram_notify.py \
+              python3 telegram_notify.py \
                 "${JOB_NAME}" \
                 "${BUILD_NUMBER}" \
                 "${currentBuild.currentResult}" \
