@@ -7,7 +7,7 @@ import subprocess
 EXPORT_DIR = Path("./certs")
 EXPORT_DIR.mkdir(exist_ok=True)
 JSON_FILE = Path("vault_san.json")
-ALT_NAMES_FILE = Path("pki/alt_names.txt")  # File with SANs, one per line
+ALT_NAMES_FILE = Path("alt_names.txt")  # File with SANs, one per line
 
 # Read alt_names from file
 if not ALT_NAMES_FILE.exists():
