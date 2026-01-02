@@ -62,7 +62,7 @@ pipeline {
                     set -e
                     export VAULT_TOKEN="$(cat "${WORKSPACE}/vault.token")"
                     echo "Issuing certificate via Vault..."
-                    python3 certs_issue.py
+                    python3 pki/certs_issue.py
                 '''
             }
         }
@@ -133,7 +133,7 @@ post {
         ]) {
             sh """
               rm -rf "${WORKSPACE}/certs" "${WORKSPACE}/vault.token"
-              python3 telegram_notify.py \
+              python3 integrations/telegram_notify.py \
                 "${JOB_NAME}" \
                 "${BUILD_NUMBER}" \
                 "${currentBuild.currentResult}" \
