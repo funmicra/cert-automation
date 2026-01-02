@@ -9,7 +9,7 @@ if not BOT_TOKEN or not CHAT_ID:
     raise RuntimeError("Missing Telegram credentials in environment variables")
 
 def send_telegram_message(message: str):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot8168976601:AAEaLsFSRS3PL5sKIF139z3qif9Md4nr7dY/sendMessage"
     payload = {
         "chat_id": CHAT_ID,
         "text": message,
