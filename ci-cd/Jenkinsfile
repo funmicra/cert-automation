@@ -9,7 +9,7 @@ pipeline {
         stage('Checkout') {
             steps {                 
                 git(
-                    url: "https://${GIT_USER}:${GIT_TOKEN}@github.com/funmicra/cert-automation.git",
+                    url: "https://github.com/funmicra/cert-automation.git",
                     branch: 'master',
                     credentialsId: 'github-creds'
                 )
