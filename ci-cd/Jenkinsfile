@@ -5,23 +5,51 @@ pipeline {
         cron('H H */2 * *')
     }
 
-    environment {
-        VAULT_ADDR = credentials('VAULT_ADDR')
-    }
-
     stages {
-
         stage('Checkout') {
+            steps {                 
+                git(
+                    url: "https://${GIT_USER}:${GIT_TOKEN}@github.com/funmicra/cert-automation.git",
+                    branch: 'master'
+                    credentialsId: 'github-creds'
+                )
+            }
+        }    
+
+        stage('Check & Unseal Vault') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'github-creds',
-                    usernameVariable: 'GIT_USER',
-                    passwordVariable: 'GIT_TOKEN'
-                )]) {
-                    git(
-                        url: "https://${GIT_USER}:${GIT_TOKEN}@github.com/funmicra/cert-automation.git",
-                        branch: 'master'
-                    )
+                withCredentials([
+                    string(credentialsId: 'VAULT_ADDR', variable: 'VAULT_ADDR'),
+                    string(credentialsId: 'VAULT_UNSEAL_KEY_1', variable: 'UNSEAL_KEY_1'),
+                    string(credentialsId: 'VAULT_UNSEAL_KEY_2', variable: 'UNSEAL_KEY_2'),
+                    string(credentialsId: 'VAULT_UNSEAL_KEY_3', variable: 'UNSEAL_KEY_3')
+                ]) {
+                    sh '''
+                        set -e
+
+                        echo "Checking Vault seal status"
+                        SEALED=$(vault status -format=json | jq -r .sealed)
+
+                        if [ "$SEALED" = "false" ]; then
+                            echo "Vault is already unsealed"
+                            exit 0
+                        fi
+
+                        echo "Vault is sealed — starting unseal process"
+
+                        vault operator unseal "$UNSEAL_KEY_1"
+                        vault operator unseal "$UNSEAL_KEY_2"
+                        vault operator unseal "$UNSEAL_KEY_3"
+
+                        SEALED=$(vault status -format=json | jq -r .sealed)
+
+                        if [ "$SEALED" != "false" ]; then
+                            echo "Vault unseal failed"
+                            exit 1
+                        fi
+
+                        echo "Vault successfully unsealed"
+                    '''
                 }
             }
         }
