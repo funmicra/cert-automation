@@ -86,14 +86,21 @@ pipeline {
 
         stage('Issue certificate') {
             steps {
-                sh '''
-                    set -e
-                    export VAULT_TOKEN="$(cat "${WORKSPACE}/vault.token")"
-                    echo "Issuing certificate via Vault..."
-                    python3 pki/certs_issue.py
-                '''
+                withCredentials([
+                    string(credentialsId: 'VAULT_ADDR', variable: 'VAULT_ADDR')
+                ]) {
+                    sh '''
+                        set -e
+                        export VAULT_ADDR="$VAULT_ADDR"
+                        export VAULT_TOKEN="$(cat "${WORKSPACE}/vault.token")"
+
+                        echo "Issuing certificate via Vault..."
+                        python3 pki/certs_issue.py
+                    '''
+                }
             }
         }
+
 
         stage('Copy certs to local NGINX stack') {
             steps {
