@@ -11,7 +11,7 @@ pipeline {
                 git(
                     url: "https://github.com/funmicra/cert-automation.git",
                     branch: 'master',
-                    credentialsId: 'github-creds'
+                    credentialsId: 'GITHUB-CREDENTIALS'
                 )
             }
         }    
@@ -144,7 +144,7 @@ pipeline {
                         set -e
 
                         REMOTE_HOST=192.168.88.22
-                        SSH_USER=funmicra
+                        SSH_USER=ansible
                         SSH_OPTS="-o StrictHostKeyChecking=no -o BatchMode=yes"
 
                         echo "Validating NGINX configuration"
