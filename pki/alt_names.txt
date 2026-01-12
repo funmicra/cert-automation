@@ -1,6 +1,7 @@
 proxmox.syndicate
 omv.syndicate
 jenkins.syndicate
+gitea.syndicate
 pikvm.syndicate
 portainer.syndicate
 wallos.syndicate
