@@ -9,6 +9,7 @@ heimdall.syndicate
 nexus.syndicate
 registry.syndicate
 it-tools.syndicate
+wg.syndicate
 n8n.syndicate
 grafana.syndicate
 prometheus.syndicate
