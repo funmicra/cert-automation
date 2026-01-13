@@ -19,7 +19,7 @@ alt_names_str = ",".join(alt_names_list)
 
 # Vault command
 vault_command = [
-    "vault", "write", "-format=json", "pki_int/issue/syndicate",
+    "vault", "write", "-format=json", "pki-int/issue/syndicate",
     "common_name=syndicate",
     f"alt_names={alt_names_str}",
     "ttl=48h",
