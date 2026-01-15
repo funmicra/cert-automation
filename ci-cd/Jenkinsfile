@@ -101,42 +101,41 @@ pipeline {
             }
         }
 
-
         stage('Copy certs to local NGINX stack') {
             steps {
                 sshagent(['DEBIANSERVER']) {
                     sh '''
+                        #!/usr/bin/env bash
                         set -eu
 
-                        REMOTE_HOST=192.168.88.22
-                        SSH_USER=ansible
-                        LOCAL_CERT_DIR=/etc/nginx/certs
+                        REMOTE_HOST="192.168.88.22"
+                        SSH_USER="ansible"
+                        LOCAL_CERT_DIR="/etc/nginx/certs"
                         CERT_DIR="${WORKSPACE}/certs"
-
                         SSH_OPTS="-o StrictHostKeyChecking=no -o BatchMode=yes"
 
                         echo "Verifying certificates exist"
-                        test -f "$CERT_DIR/syndicate.key"
-                        test -f "$CERT_DIR/fullchain.pem"
+                        for f in "syndicate.key" "fullchain.pem"; do
+                            if [ ! -f "$CERT_DIR/$f" ]; then
+                                echo "ERROR: $CERT_DIR/$f not found!"
+                                exit 1
+                            fi
+                        done
 
                         echo "Preparing certificate directory on remote host"
-                        ssh $SSH_OPTS "$SSH_USER@$REMOTE_HOST" \
-                        "sudo mkdir -p $LOCAL_CERT_DIR && sudo chmod 700 $LOCAL_CERT_DIR"
+                        ssh $SSH_OPTS "$SSH_USER@$REMOTE_HOST" "sudo mkdir -p \"$LOCAL_CERT_DIR\" && sudo chmod 700 \"$LOCAL_CERT_DIR\""
 
-                        # Copy to /tmp first
-                        echo "Copying certificates"
-                        scp $SSH_OPTS \
-                            "$CERT_DIR/syndicate.key" \
-                            "$CERT_DIR/fullchain.pem" \
-                            "$SSH_USER@$REMOTE_HOST:/tmp/"
+                        echo "Copying certificates to remote temporary location"
+                        scp $SSH_OPTS "$CERT_DIR/syndicate.key" "$CERT_DIR/fullchain.pem" "$SSH_USER@$REMOTE_HOST:/tmp/"
 
-
-                        # Move to /etc/nginx/certs with sudo
-                        echo "Fixing permissions"
+                        echo "Moving certificates to root-owned directory and fixing permissions"
                         ssh $SSH_OPTS "$SSH_USER@$REMOTE_HOST" "
-                            sudo mv /tmp/syndicate.key $LOCAL_CERT_DIR/ &&
-                            sudo mv /tmp/fullchain.pem $LOCAL_CERT_DIR/ &&
-                            sudo chmod 600 $LOCAL_CERT_DIR/syndicate.key $LOCAL_CERT_DIR/fullchain.pem
+                            sudo mv /tmp/syndicate.key \"$LOCAL_CERT_DIR/\" &&
+                            sudo mv /tmp/fullchain.pem \"$LOCAL_CERT_DIR/\" &&
+                            sudo chmod 600 \"$LOCAL_CERT_DIR/syndicate.key\" \"$LOCAL_CERT_DIR/fullchain.pem\"
+                        "
+
+                        echo "Certificates deployed successfully to $REMOTE_HOST:$LOCAL_CERT_DIR"
                     '''
                 }
             }
