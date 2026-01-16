@@ -19,4 +19,5 @@ vault.syndicate
 nextcloud.syndicate
 semaphore.syndicate
 lte-router.syndicate
+sonarqube.syndicate
 syndicate
