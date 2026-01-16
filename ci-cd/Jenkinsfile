@@ -110,23 +110,26 @@ pipeline {
 
                     echo "Running certificate chain validation"
 
-                    # Sanity checks
-                    for f in fullchain.pem root-ca.pem; do
+                    # Required artifacts
+                    for f in syndicate.pem intermediate.pem root-ca.pem; do
                         if [ ! -f "$CERT_DIR/$f" ]; then
                             echo "ERROR: $CERT_DIR/$f missing"
                             exit 1
                         fi
                     done
 
-                    echo "Verifying fullchain against root CA"
+                    echo "Validating leaf → intermediate → root"
+
                     openssl verify \
                         -CAfile "$CERT_DIR/root-ca.pem" \
-                        "$CERT_DIR/fullchain.pem"
+                        -untrusted "$CERT_DIR/intermediate.pem" \
+                        "$CERT_DIR/syndicate.pem"
 
                     echo "Certificate chain validation passed"
                 '''
             }
         }
+
 
         stage('Copy certs to local NGINX stack') {
             steps {
