@@ -104,6 +104,7 @@ pipeline {
         stage('Validate certificate chain') {
             steps {
                 sh '''
+                    #!/usr/bin/env bash
                     set -euo pipefail
 
                     CERT_DIR="${WORKSPACE}/certs"
@@ -135,8 +136,6 @@ pipeline {
                 '''
             }
         }
-
-
 
         stage('Copy certs to local NGINX stack') {
             steps {
