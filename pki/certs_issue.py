@@ -1,39 +1,68 @@
 import json
 import re
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
+# =========================
 # Configuration
+# =========================
+
 EXPORT_DIR = Path("./certs")
-EXPORT_DIR.mkdir(exist_ok=True)
+EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 JSON_FILE = Path("vault_san.json")
-ALT_NAMES_FILE = Path("pki/alt_names.txt")
+ALT_NAMES_FILE = Path("pki/alt_names.txt")  # one SAN per line
 
+# =========================
+# Helpers
+# =========================
+
+def clean_pem(pem: str) -> str:
+    return "\n".join(
+        line.strip() for line in pem.splitlines() if line.strip()
+    ) + "\n"
+
+def extract_block(pattern: str, text: str, name: str) -> str:
+    match = re.search(pattern, text, re.DOTALL)
+    if not match:
+        raise ValueError(f"Cannot extract {name}")
+    return clean_pem(match.group(1))
+
+# =========================
 # Read SANs
+# =========================
+
 if not ALT_NAMES_FILE.exists():
     raise FileNotFoundError(f"{ALT_NAMES_FILE} does not exist")
 
 with ALT_NAMES_FILE.open() as f:
     alt_names = [line.strip() for line in f if line.strip()]
 
+if not alt_names:
+    raise ValueError("ALT names file is empty")
+
 alt_names_str = ",".join(alt_names)
 
-# Vault command
+# =========================
+# Issue cert from Vault
+# =========================
+
 vault_command = [
     "vault", "write", "-format=json",
     "pki-int/issue/syndicate",
     "common_name=syndicate",
     f"alt_names={alt_names_str}",
     "ttl=48h",
-    "format=pem_bundle"
+    "format=pem_bundle",
 ]
 
-# Run Vault command
 with JSON_FILE.open("w") as f:
     subprocess.run(vault_command, stdout=f, check=True)
 
-# Load Vault response
+# =========================
+# Parse Vault response
+# =========================
+
 with JSON_FILE.open() as f:
     raw = json.load(f)
 
@@ -41,58 +70,52 @@ data = raw.get("data", {})
 
 leaf_bundle = data.get("certificate")
 issuing_ca = data.get("issuing_ca")
-ca_chain = data.get("ca_chain", [])
 
-if not leaf_bundle or not issuing_ca:
-    raise ValueError("Vault response missing certificate or issuing_ca")
+if not leaf_bundle:
+    raise ValueError("Vault response missing certificate bundle")
 
-# Extract private key + leaf cert
-private_key_match = re.search(
+if not issuing_ca:
+    raise ValueError("Vault response missing issuing_ca (intermediate)")
+
+# =========================
+# Extract leaf + key
+# =========================
+
+private_key = extract_block(
     r"(-----BEGIN .*PRIVATE KEY-----.*?-----END .*PRIVATE KEY-----)",
     leaf_bundle,
-    re.DOTALL
+    "private key",
 )
-leaf_cert_match = re.search(
+
+leaf_cert = extract_block(
     r"(-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----)",
     leaf_bundle,
-    re.DOTALL
+    "leaf certificate",
 )
 
-if not private_key_match or not leaf_cert_match:
-    raise ValueError("Failed to extract private key or leaf certificate")
-
-def clean_pem(pem: str) -> str:
-    return "\n".join(line.strip() for line in pem.splitlines() if line.strip()) + "\n"
-
-private_key = clean_pem(private_key_match.group(1))
-leaf_cert = clean_pem(leaf_cert_match.group(1))
 issuing_ca = clean_pem(issuing_ca)
-ca_chain = [clean_pem(c) for c in ca_chain]
 
-# Write key and leaf
-(EXPORT_DIR / "syndicate.key").write_text(private_key)
-(EXPORT_DIR / "syndicate.key").chmod(0o600)
+# =========================
+# Write files
+# =========================
+
+key_file = EXPORT_DIR / "syndicate.key"
+key_file.write_text(private_key)
+key_file.chmod(0o600)
 
 (EXPORT_DIR / "syndicate.pem").write_text(leaf_cert)
 
-# Build FULLCHAIN CORRECTLY
-# leaf + issuing CA + any additional intermediates (exclude root)
-fullchain_parts = [leaf_cert, issuing_ca]
+# 🔒 FULLCHAIN RULE:
+# leaf + issuing intermediate ONLY
+fullchain = leaf_cert + issuing_ca
+(EXPORT_DIR / "fullchain.pem").write_text(fullchain)
 
-# ca_chain may contain issuing_ca again → avoid duplication
-for cert in ca_chain:
-    if cert not in fullchain_parts:
-        fullchain_parts.append(cert)
+# Optional: keep intermediate explicit for debugging / audits
+(EXPORT_DIR / "intermediate.pem").write_text(issuing_ca)
 
-# Drop root CA if present (last cert in chain)
-fullchain_parts = fullchain_parts[:-1]
+print("Certificates successfully issued:")
+print(f" - {EXPORT_DIR / 'syndicate.key'}")
+print(f" - {EXPORT_DIR / 'syndicate.pem'}")
+print(f" - {EXPORT_DIR / 'fullchain.pem'}")
+print(f" - {EXPORT_DIR / 'intermediate.pem'}")
 
-fullchain_pem = "\n".join(fullchain_parts)
-(EXPORT_DIR / "fullchain.pem").write_text(fullchain_pem)
-
-# Export root CA separately (optional but recommended)
-if ca_chain:
-    root_ca = ca_chain[-1]
-    (EXPORT_DIR / "root-ca.pem").write_text(root_ca)
-
-print(f"Certificates exported to {EXPORT_DIR.resolve()}")
