@@ -7,10 +7,10 @@ from pathlib import Path
 # Configuration
 # =========================
 
-EXPORT_DIR = Path("./certs")
+EXPORT_DIR = Path("pki/certs")
 EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
-JSON_FILE = Path("vault_san.json")
+JSON_FILE = Path("pki/vault_san.json")
 ALT_NAMES_FILE = Path("pki/alt_names.txt")  # one SAN per line
 
 # =========================
@@ -18,9 +18,8 @@ ALT_NAMES_FILE = Path("pki/alt_names.txt")  # one SAN per line
 # =========================
 
 def clean_pem(pem: str) -> str:
-    return "\n".join(
-        line.strip() for line in pem.splitlines() if line.strip()
-    ) + "\n"
+    """Normalize PEM formatting."""
+    return "\n".join(line.strip() for line in pem.splitlines() if line.strip()) + "\n"
 
 def extract_block(pattern: str, text: str, name: str) -> str:
     match = re.search(pattern, text, re.DOTALL)
@@ -56,8 +55,8 @@ vault_command = [
     "format=pem_bundle",
 ]
 
-with JSON_FILE.open("w") as f:
-    subprocess.run(vault_command, stdout=f, check=True)
+# Run Vault command and save JSON response
+subprocess.run(vault_command, stdout=JSON_FILE.open("w"), check=True)
 
 # =========================
 # Parse Vault response
@@ -70,12 +69,10 @@ data = raw.get("data", {})
 
 leaf_bundle = data.get("certificate")
 issuing_ca = data.get("issuing_ca")
+ca_chain = data.get("ca_chain", [])
 
-if not leaf_bundle:
-    raise ValueError("Vault response missing certificate bundle")
-
-if not issuing_ca:
-    raise ValueError("Vault response missing issuing_ca (intermediate)")
+if not leaf_bundle or not issuing_ca or not ca_chain:
+    raise ValueError("Vault response missing required certificates")
 
 # =========================
 # Extract leaf + key
@@ -94,54 +91,47 @@ leaf_cert = extract_block(
 )
 
 issuing_ca = clean_pem(issuing_ca)
+root_ca = clean_pem(ca_chain[0])  # first element in ca_chain is root
 
 # =========================
 # Write files
 # =========================
+# Clean PEMs
+ca_chain = [clean_pem(c) for c in ca_chain]
 
+# Assign intermediate(s) and root properly
+if len(ca_chain) == 1:
+    root_ca = ca_chain[0]
+    intermediates = ""
+elif len(ca_chain) >= 2:
+    root_ca = ca_chain[-1]                  # last is root
+    intermediates = "\n".join(ca_chain[:-1])  # all others are intermediates
+else:
+    raise RuntimeError("No CA certificates returned from Vault")
+
+# Write files
 key_file = EXPORT_DIR / "syndicate.key"
 key_file.write_text(private_key)
 key_file.chmod(0o600)
 
 (EXPORT_DIR / "syndicate.pem").write_text(leaf_cert)
+(EXPORT_DIR / "intermediate.pem").write_text(intermediates)
+(EXPORT_DIR / "fullchain.pem").write_text(leaf_cert + "\n" + intermediates)
+(EXPORT_DIR / "root-ca.pem").write_text(root_ca)
 
-# 🔒 FULLCHAIN RULE:
-# leaf + issuing intermediate ONLY
-fullchain = leaf_cert + issuing_ca
-(EXPORT_DIR / "fullchain.pem").write_text(fullchain)
+# =========================
+# Validate chain
+# =========================
 
-# Optional: keep intermediate explicit for debugging / audits
-(EXPORT_DIR / "intermediate.pem").write_text(issuing_ca)
-
-print("Certificates successfully issued:")
-print(f" - {EXPORT_DIR / 'syndicate.key'}")
-print(f" - {EXPORT_DIR / 'syndicate.pem'}")
-print(f" - {EXPORT_DIR / 'fullchain.pem'}")
-print(f" - {EXPORT_DIR / 'intermediate.pem'}")
-
-import subprocess
-from pathlib import Path
-
-CERT_DIR = Path("./certs")
-syndicate_cert = CERT_DIR / "syndicate.pem"
-intermediate_cert = CERT_DIR / "intermediate.pem"
-root_ca_cert = CERT_DIR / "root-ca.pem"
-
-# sanity checks
-for f in [syndicate_cert, intermediate_cert, root_ca_cert]:
-    if not f.exists():
-        raise FileNotFoundError(f"{f} is missing!")
-
-# validate leaf → intermediate → root
 cmd = [
     "openssl", "verify",
-    "-CAfile", str(root_ca_cert),
-    "-untrusted", str(intermediate_cert),
-    str(syndicate_cert)
+    "-CAfile", str(EXPORT_DIR / "root-ca.pem"),
+    "-untrusted", str(EXPORT_DIR / "intermediate.pem"),
+    str(EXPORT_DIR / "syndicate.pem")
 ]
 
 result = subprocess.run(cmd, capture_output=True, text=True)
 if result.returncode != 0:
     raise RuntimeError(f"Certificate chain validation failed:\n{result.stderr}")
 
-print("Certificate chain validation passed")
+print("Certificate chain validation passed ✅")
