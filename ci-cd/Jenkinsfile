@@ -133,7 +133,8 @@ pipeline {
                             sudo mv /tmp/syndicate.key \"$LOCAL_CERT_DIR/\" &&
                             sudo mv /tmp/fullchain.pem \"$LOCAL_CERT_DIR/\" &&
                             sudo chown root:root \"$LOCAL_CERT_DIR/syndicate.key\" \"$LOCAL_CERT_DIR/fullchain.pem\" &&
-                            sudo chmod 600 \"$LOCAL_CERT_DIR/syndicate.key\" \"$LOCAL_CERT_DIR/fullchain.pem\"
+                            sudo chmod 600 \"$LOCAL_CERT_DIR/syndicate.key\" &&
+                            sudo chmod 644 \"$LOCAL_CERT_DIR/fullchain.pem\" &&
                         "
 
                         echo "Certificates deployed successfully to $REMOTE_HOST:$LOCAL_CERT_DIR"
