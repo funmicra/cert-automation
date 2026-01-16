@@ -101,6 +101,33 @@ pipeline {
             }
         }
 
+        stage('Validate certificate chain') {
+            steps {
+                sh '''
+                    set -e
+
+                    CERT_DIR="${WORKSPACE}/certs"
+
+                    echo "Running certificate chain validation"
+
+                    # Sanity checks
+                    for f in fullchain.pem root-ca.pem; do
+                        if [ ! -f "$CERT_DIR/$f" ]; then
+                            echo "ERROR: $CERT_DIR/$f missing"
+                            exit 1
+                        fi
+                    done
+
+                    echo "Verifying fullchain against root CA"
+                    openssl verify \
+                        -CAfile "$CERT_DIR/root-ca.pem" \
+                        "$CERT_DIR/fullchain.pem"
+
+                    echo "Certificate chain validation passed"
+                '''
+            }
+        }
+
         stage('Copy certs to local NGINX stack') {
             steps {
                 sshagent(['DEBIANSERVER']) {

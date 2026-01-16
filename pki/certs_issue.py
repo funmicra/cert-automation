@@ -6,76 +6,93 @@ import subprocess
 # Configuration
 EXPORT_DIR = Path("./certs")
 EXPORT_DIR.mkdir(exist_ok=True)
-JSON_FILE = Path("vault_san.json")
-ALT_NAMES_FILE = Path("pki/alt_names.txt")  # File with SANs, one per line
 
-# Read alt_names from file
+JSON_FILE = Path("vault_san.json")
+ALT_NAMES_FILE = Path("pki/alt_names.txt")
+
+# Read SANs
 if not ALT_NAMES_FILE.exists():
     raise FileNotFoundError(f"{ALT_NAMES_FILE} does not exist")
 
 with ALT_NAMES_FILE.open() as f:
-    alt_names_list = [line.strip() for line in f if line.strip()]
-alt_names_str = ",".join(alt_names_list)
+    alt_names = [line.strip() for line in f if line.strip()]
+
+alt_names_str = ",".join(alt_names)
 
 # Vault command
 vault_command = [
-    "vault", "write", "-format=json", "pki-int/issue/syndicate",
+    "vault", "write", "-format=json",
+    "pki-int/issue/syndicate",
     "common_name=syndicate",
     f"alt_names={alt_names_str}",
     "ttl=48h",
     "format=pem_bundle"
 ]
 
-# Run Vault command and save output
+# Run Vault command
 with JSON_FILE.open("w") as f:
     subprocess.run(vault_command, stdout=f, check=True)
 
-# Load JSON
+# Load Vault response
 with JSON_FILE.open() as f:
     raw = json.load(f)
 
 data = raw.get("data", {})
 
-leaf_pem = data.get("certificate")
-ca_chain = data.get("ca_chain", [])
+leaf_bundle = data.get("certificate")
 issuing_ca = data.get("issuing_ca")
+ca_chain = data.get("ca_chain", [])
 
-if not leaf_pem:
-    raise ValueError("Leaf certificate (or private key) missing in JSON!")
+if not leaf_bundle or not issuing_ca:
+    raise ValueError("Vault response missing certificate or issuing_ca")
 
-# Extract private key and certificate
+# Extract private key + leaf cert
 private_key_match = re.search(
-    r"(-----BEGIN .*PRIVATE KEY-----.*?-----END .*PRIVATE KEY-----)", leaf_pem, re.DOTALL
+    r"(-----BEGIN .*PRIVATE KEY-----.*?-----END .*PRIVATE KEY-----)",
+    leaf_bundle,
+    re.DOTALL
 )
-cert_match = re.search(
-    r"(-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----)", leaf_pem, re.DOTALL
+leaf_cert_match = re.search(
+    r"(-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----)",
+    leaf_bundle,
+    re.DOTALL
 )
 
-if not private_key_match or not cert_match:
-    raise ValueError("Cannot extract private key or certificate from JSON!")
-
-private_key = private_key_match.group(1).strip()
-leaf_cert = cert_match.group(1).strip()
+if not private_key_match or not leaf_cert_match:
+    raise ValueError("Failed to extract private key or leaf certificate")
 
 def clean_pem(pem: str) -> str:
     return "\n".join(line.strip() for line in pem.splitlines() if line.strip()) + "\n"
 
-private_key = clean_pem(private_key)
-leaf_cert = clean_pem(leaf_cert)
+private_key = clean_pem(private_key_match.group(1))
+leaf_cert = clean_pem(leaf_cert_match.group(1))
+issuing_ca = clean_pem(issuing_ca)
 ca_chain = [clean_pem(c) for c in ca_chain]
 
-# Write files
-key_file = EXPORT_DIR / "syndicate.key"
-key_file.write_text(private_key)
-key_file.chmod(0o600)
+# Write key and leaf
+(EXPORT_DIR / "syndicate.key").write_text(private_key)
+(EXPORT_DIR / "syndicate.key").chmod(0o600)
 
 (EXPORT_DIR / "syndicate.pem").write_text(leaf_cert)
 
-intermediates_only = ca_chain[:-1] if len(ca_chain) > 1 else []
-fullchain = "\n".join([leaf_cert] + intermediates_only)
-(EXPORT_DIR / "fullchain.pem").write_text(fullchain)
+# Build FULLCHAIN CORRECTLY
+# leaf + issuing CA + any additional intermediates (exclude root)
+fullchain_parts = [leaf_cert, issuing_ca]
 
-if issuing_ca:
-    (EXPORT_DIR / "intermediate.pem").write_text(clean_pem(issuing_ca))
+# ca_chain may contain issuing_ca again → avoid duplication
+for cert in ca_chain:
+    if cert not in fullchain_parts:
+        fullchain_parts.append(cert)
 
-print(f"Certificates and key exported successfully to {EXPORT_DIR.resolve()}")
+# Drop root CA if present (last cert in chain)
+fullchain_parts = fullchain_parts[:-1]
+
+fullchain_pem = "\n".join(fullchain_parts)
+(EXPORT_DIR / "fullchain.pem").write_text(fullchain_pem)
+
+# Export root CA separately (optional but recommended)
+if ca_chain:
+    root_ca = ca_chain[-1]
+    (EXPORT_DIR / "root-ca.pem").write_text(root_ca)
+
+print(f"Certificates exported to {EXPORT_DIR.resolve()}")
