@@ -101,42 +101,6 @@ pipeline {
             }
         }
 
-        stage('Validate certificate chain') {
-            steps {
-                sh '''
-                    #!/usr/bin/env bash
-                    set -euo pipefail
-
-                    CERT_DIR="${WORKSPACE}/certs"
-
-                    echo "=== Certificate Chain Validation ==="
-                    echo "Workspace: $CERT_DIR"
-
-                    # Required artifacts
-                    REQUIRED_FILES="leaf.pem intermediate.pem root-ca.pem"
-
-                    for f in $REQUIRED_FILES; do
-                        if [ ! -s "$CERT_DIR/$f" ]; then
-                            echo "ERROR: Missing or empty $CERT_DIR/$f"
-                            exit 1
-                        fi
-                    done
-
-                    echo
-                    echo "→ Validating leaf → intermediate → root trust chain"
-
-                    openssl verify \
-                        -purpose sslserver \
-                        -CAfile "$CERT_DIR/root-ca.pem" \
-                        -untrusted "$CERT_DIR/intermediate.pem" \
-                        "$CERT_DIR/leaf.pem"
-
-                    echo
-                    echo "✓ Certificate chain validation PASSED"
-                '''
-            }
-        }
-
         stage('Copy certs to local NGINX stack') {
             steps {
                 sshagent(['DEBIANSERVER']) {

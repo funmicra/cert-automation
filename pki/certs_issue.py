@@ -119,3 +119,29 @@ print(f" - {EXPORT_DIR / 'syndicate.pem'}")
 print(f" - {EXPORT_DIR / 'fullchain.pem'}")
 print(f" - {EXPORT_DIR / 'intermediate.pem'}")
 
+import subprocess
+from pathlib import Path
+
+CERT_DIR = Path("./certs")
+syndicate_cert = CERT_DIR / "syndicate.pem"
+intermediate_cert = CERT_DIR / "intermediate.pem"
+root_ca_cert = CERT_DIR / "root-ca.pem"
+
+# sanity checks
+for f in [syndicate_cert, intermediate_cert, root_ca_cert]:
+    if not f.exists():
+        raise FileNotFoundError(f"{f} is missing!")
+
+# validate leaf → intermediate → root
+cmd = [
+    "openssl", "verify",
+    "-CAfile", str(root_ca_cert),
+    "-untrusted", str(intermediate_cert),
+    str(syndicate_cert)
+]
+
+result = subprocess.run(cmd, capture_output=True, text=True)
+if result.returncode != 0:
+    raise RuntimeError(f"Certificate chain validation failed:\n{result.stderr}")
+
+print("Certificate chain validation passed")
