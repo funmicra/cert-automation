@@ -72,7 +72,7 @@ key_file.chmod(0o600)
 (EXPORT_DIR / "syndicate.pem").write_text(leaf_cert)
 
 intermediates_only = ca_chain[:-1] if len(ca_chain) > 1 else []
-fullchain = "\n".join([leaf_cert] + ca_chain)
+fullchain = "\n".join([leaf_cert] + intermediates_only)
 (EXPORT_DIR / "fullchain.pem").write_text(fullchain)
 
 if issuing_ca:
