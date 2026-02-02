@@ -20,4 +20,6 @@ nextcloud.syndicate
 semaphore.syndicate
 lte-router.syndicate
 sonarqube.syndicate
+rancher.syndicate
+authentik.syndicate
 syndicate
