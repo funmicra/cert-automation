@@ -17,6 +17,7 @@ uptime-kuma.syndicate
 dvr.syndicate
 vault.syndicate
 nextcloud.syndicate
+office.syndicate
 semaphore.syndicate
 lte-router.syndicate
 sonarqube.syndicate
