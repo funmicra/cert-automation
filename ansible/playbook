@@ -1,11 +1,11 @@
 ---
 - name: Install Syndicate Issuing CA and update trust store
-  hosts: Syndicate
+  hosts: k8s
   become: true
 
   vars:
-    local_ca_src: "./certs/intermediate.pem"
-    system_ca_dest: "/usr/local/share/ca-certificates/syndicate-ca.crt"
+    local_ca_src: "/home/funmicra/Documents/Projects/cert-automation/pki/certs/intermediate.pem"
+    system_ca_dest: "/usr/local/share/ca-certificates/root-ca.pem"
 
   tasks:
     - name: Copy issuing CA to system CA directory
