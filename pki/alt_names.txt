@@ -1,4 +1,5 @@
 proxmox.syndicate
+zabbix.syndicate
 omv.syndicate
 jenkins.syndicate
 gitea.syndicate
