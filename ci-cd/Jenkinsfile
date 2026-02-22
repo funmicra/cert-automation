@@ -171,7 +171,9 @@ post {
     always {
         withCredentials([
             string(credentialsId: 'TELEGRAM_BOT_TOKEN', variable: 'TELEGRAM_BOT_TOKEN'),
-            string(credentialsId: 'TELEGRAM_CHAT_ID', variable: 'TELEGRAM_CHAT_ID')
+            string(credentialsId: 'TELEGRAM_CHAT_ID', variable: 'TELEGRAM_CHAT_ID'),
+            string(credentialsId: 'DISCORD_WEBHOOK_URL', variable: 'DISCORD_WEBHOOK_URL')
+            
         ]) {
             sh """
               rm -rf "${WORKSPACE}/certs" "${WORKSPACE}/vault.token"
