@@ -24,4 +24,5 @@ lte-router.syndicate
 sonarqube.syndicate
 rancher.syndicate
 authentik.syndicate
+skill90.syndicate
 syndicate
